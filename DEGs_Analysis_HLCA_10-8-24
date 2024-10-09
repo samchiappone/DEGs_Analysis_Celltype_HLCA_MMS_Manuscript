@@ -11,10 +11,10 @@ library(pheatmap)
 
 #Make individual pseudobulk dataframes for each cell type
 
-setwd("~/R/TCGA/Music_cellular_deconvolution")
+setwd("~/R/TCGA/Music_cellular_deconvolution/LUAD_vs_HLCA_9-16-24")
 Pseudobulk_Alternative_HLCA_reference_healthy_lungcells_import <- readRDS("~/R/TCGA/Music_cellular_deconvolution/Pseudobulk_Alternative_HLCA_reference_healthy_lungcells.rds")
 Pseudobulk_Alternative_HLCA_reference_healthy_lungcells <- data.frame(Pseudobulk_Alternative_HLCA_reference_healthy_lungcells_import$RNA)
-LUAD_data <- readRDS("Pseudobulk_LUAD_Atlas_df_pruned_average_counts.rds")
+LUAD_data <- readRDS("~/R/TCGA/Music_cellular_deconvolution/Pseudobulk_LUAD_mEGFR_malignant_cell_summed_counts.rds")
 mart <- biomaRt::useDataset("hsapiens_gene_ensembl", biomaRt::useMart("ensembl"))
 symb <- biomaRt::keys(org.Hs.eg.db, "SYMBOL")
 genes <- rownames(LUAD_data)
@@ -47,8 +47,8 @@ DESeq2_matrix <- cbind(round(get(CELLTYPE_PSEUDOBULK)), round(Pseudobulk_LUAD_mE
    smallestGroupSize <- min(table(colData[,1]))
    keep <- rowSums(DESeq2::counts(DESeq2_object) >= 10) >= smallestGroupSize
    DESeq2_object <- DESeq2_object[keep,]
-   DESeq2_object <- DESeq2::DESeq(DESeq2_object, betaPrior=FALSE)
-   assign(paste0(CELLTYPE_PSEUDOBULK, "_results"), DESeq2::results(DESeq2_object, contrast=c("condition","LUAD","celltype"), lfcThreshold = 1, altHypothesis = c("greaterAbs"), alpha=0.05))
+   DESeq2_object <- DESeq2::DESeq(DESeq2_object)
+   assign(paste0(CELLTYPE_PSEUDOBULK, "_results"), DESeq2::results(DESeq2_object, contrast=c("condition","LUAD","celltype"), alpha=0.05))
    assign(paste0(CELLTYPE_PSEUDOBULK, "_results_df"), data.frame(get(paste0(CELLTYPE_PSEUDOBULK, "_results"))))
 print(CELLTYPE_PSEUDOBULK)
 print(nrow(na.omit(get(paste0(CELLTYPE_PSEUDOBULK, "_results_df"))[get(paste0(CELLTYPE_PSEUDOBULK, "_results_df"))$padj < 0.05 & abs(get(paste0(CELLTYPE_PSEUDOBULK, "_results_df"))$log2FoldChange) > 1,])))
@@ -76,8 +76,8 @@ DESeq2_matrix <- cbind(round(get(CELLTYPE_PSEUDOBULK)), round(get(OTHER_CELLTYPE
    smallestGroupSize <- min(table(colData[,1]))
    keep <- rowSums(DESeq2::counts(DESeq2_object) >= 10) >= smallestGroupSize
    DESeq2_object <- DESeq2_object[keep,]
-   DESeq2_object <- DESeq2::DESeq(DESeq2_object, betaPrior=FALSE)
-   assign(paste0(CELLTYPE_PSEUDOBULK, "_", OTHER_CELLTYPE, "_", "_results"), DESeq2::results(DESeq2_object, contrast=c("condition","celltype","other_celltype"), lfcThreshold = 1, altHypothesis = c("greaterAbs"), alpha=0.05))
+   DESeq2_object <- DESeq2::DESeq(DESeq2_object)
+   assign(paste0(CELLTYPE_PSEUDOBULK, "_", OTHER_CELLTYPE, "_", "_results"), DESeq2::results(DESeq2_object, contrast=c("condition","celltype","other_celltype"), alpha=0.05))
    assign(paste0(CELLTYPE_PSEUDOBULK, "_", OTHER_CELLTYPE, "_", "_results_df"), data.frame(get(paste0(CELLTYPE_PSEUDOBULK, "_", OTHER_CELLTYPE, "_", "_results"))))
 print(CELLTYPE_PSEUDOBULK)
 print(OTHER_CELLTYPE)
@@ -109,130 +109,54 @@ write.table(nrow(na.omit(get(LUAD_RESULTS)[get(LUAD_RESULTS)$padj < 0.05 & abs(g
 
 Celltype_DEGs_proportions <- read.table("Celltype_DEGs_proportions.txt", header=FALSE)
 mEGFR_LUAD_DEGs_proportions <- read.table("mEGFR_LUAD_DEGs_proportions.txt", header=FALSE)
-
 Celltype_DEGs_proportions_names <- cbind(ls(pattern="__results_df$"), Celltype_DEGs_proportions)
 Celltype_DEGs_proportions_matrix <- matrix(Celltype_DEGs_proportions_names$V2, nrow=42, byrow=FALSE)
 Celltype_DEGs_proportions_matrix <- cbind(mEGFR_LUAD_DEGs_proportions$V2, Celltype_DEGs_proportions_matrix)
 Celltype_DEGs_proportions_matrix <- rbind(c(0, mEGFR_LUAD_DEGs_proportions$V2), Celltype_DEGs_proportions_matrix)
-Celltype_DEGs_proportions_matrix_triangular <- Celltype_DEGs_proportions_matrix
-Celltype_DEGs_proportions_matrix_triangular[upper.tri(Celltype_DEGs_proportions_matrix_triangular)] <- NA
-Celltype_DEGs_proportions_matrix_triangular_df <- as.data.frame(Celltype_DEGs_proportions_matrix_triangular)
-rownames(Celltype_DEGs_proportions_matrix_triangular_df) <- c("mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$"))) 
-colnames(Celltype_DEGs_proportions_matrix_triangular_df) <- c("mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$")))
-pheatmap(Celltype_DEGs_proportions_matrix_triangular_df, cluster_rows = FALSE, cluster_cols = FALSE)
-Epithelial_cell_index <- c(1,2,3,4,5,6,7,9,11,12,13,14,19,21,22,25,27,30,34,38,42,43)
-Celltype_DEGs_proportions_matrix_triangular_df_epithelial <- Celltype_DEGs_proportions_matrix_triangular_df[Epithelial_cell_index,Epithelial_cell_index]
-#pheatmap(Celltype_DEGs_proportions_matrix_triangular_df_epithelial, cluster_rows = FALSE, cluster_cols = FALSE)
-
-dev.off()
-png(file="Celltype_DEGs_proportions_heatmap.png", height=480, width=560)
-pheatmap(Celltype_DEGs_proportions_matrix_triangular_df, cluster_rows = FALSE, cluster_cols = FALSE)
-dev.off()
+Celltype_DEGs_proportions_names <- cbind(ls(pattern="__results_df$"), Celltype_DEGs_proportions)
+Celltype_DEGs_proportions_matrix <- matrix(Celltype_DEGs_proportions_names$V2, nrow=42, byrow=FALSE)
+Celltype_DEGs_proportions_matrix <- cbind(mEGFR_LUAD_DEGs_proportions$V2, Celltype_DEGs_proportions_matrix)
+Celltype_DEGs_proportions_matrix <- rbind(c(0, mEGFR_LUAD_DEGs_proportions$V2), Celltype_DEGs_proportions_matrix)
 
 Celltype_DEGs_proportions_matrix_df <- as.data.frame(Celltype_DEGs_proportions_matrix)
 rownames(Celltype_DEGs_proportions_matrix_df) <- c("mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$"))) 
 colnames(Celltype_DEGs_proportions_matrix_df) <- c("mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$")))
-Celltype_DEGs_proportions_matrix_df_epithelial <- Celltype_DEGs_proportions_matrix_df[Epithelial_cell_index,Epithelial_cell_index]
-Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- Celltype_DEGs_proportions_matrix_df_epithelial[, order(Celltype_DEGs_proportions_matrix_df_epithelial[,1])]
-Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- arrange(Celltype_DEGs_proportions_matrix_df_epithelial_ordered, mEGFR.LUAD)
-Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular <- Celltype_DEGs_proportions_matrix_df_epithelial_ordered
-Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular[upper.tri(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular)] <- NA
-#pheatmap(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular, cluster_rows = FALSE, cluster_cols = FALSE)
-
-#dev.off()
-png(file="Celltype_DEGs_proportions_epithelial_heatmap.png", height=480, width=560)
-pheatmap(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular, cluster_rows = FALSE, cluster_cols = FALSE)
-dev.off()
-
-
-
-#Do mKRAS LUAD
-
-#Do each test of mKRAS against celltype using a for loop
-
-for (CELLTYPE_PSEUDOBULK in ls(pattern="_Pseudobulk_df$")) {
-if(length(colnames(get(CELLTYPE_PSEUDOBULK))) > 1) {
-DESeq2_matrix <- cbind(round(get(CELLTYPE_PSEUDOBULK)), round(Pseudobulk_LUAD_mKRAS_malignant_cells_df_pruned_common))
-   colnames(DESeq2_matrix) <- gsub(" ","_",colnames(DESeq2_matrix))
-   colnames(DESeq2_matrix) <- gsub("\\-","_",colnames(DESeq2_matrix))
-   colData <- cbind(c(rep("celltype", ncol(get(CELLTYPE_PSEUDOBULK))), rep("LUAD", ncol(Pseudobulk_LUAD_mKRAS_malignant_cells_df_pruned_common))), c(rep("Normal_scRNASeq", ncol(get(CELLTYPE_PSEUDOBULK))), rep("LUAD_scRNASeq", ncol(Pseudobulk_LUAD_mKRAS_malignant_cells_df_pruned_common))))
-   colnames(colData) <- c("condition","type")
-   rownames(colData) <- colnames(DESeq2_matrix)
-   DESeq2_object <- DESeq2::DESeqDataSetFromMatrix(countData=DESeq2_matrix, colData=colData, design = ~ condition)
-   smallestGroupSize <- min(table(colData[,1]))
-   keep <- rowSums(DESeq2::counts(DESeq2_object) >= 10) >= smallestGroupSize
-   DESeq2_object <- DESeq2_object[keep,]
-   DESeq2_object <- DESeq2::DESeq(DESeq2_object, betaPrior=FALSE)
-   assign(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_results"), DESeq2::results(DESeq2_object, contrast=c("condition","LUAD","celltype"), lfcThreshold = 1, altHypothesis = c("greaterAbs"), alpha=0.05))
-   assign(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_results_df"), data.frame(get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_results"))))
-print(CELLTYPE_PSEUDOBULK)
-print(nrow(na.omit(get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_results_df"))[get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_results_df"))$padj < 0.05 & abs(get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_results_df"))$log2FoldChange) > 1,])))
-print(nrow(na.omit(get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_results_df"))[get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_results_df"))$padj < 1.1,])))
-   }
-else {
-     next
-   }
-}
-
-CELLTYPE_PSEUDOBULK <- "Pseudobulk_LUAD_mEGFR_malignant_cells_df_pruned_common"
-DESeq2_matrix <- cbind(round(get(CELLTYPE_PSEUDOBULK)), round(Pseudobulk_LUAD_mKRAS_malignant_cells_df_pruned_common))
-   colnames(DESeq2_matrix) <- gsub(" ","_",colnames(DESeq2_matrix))
-   colnames(DESeq2_matrix) <- gsub("\\-","_",colnames(DESeq2_matrix))
-   colData <- cbind(c(rep("celltype", ncol(get(CELLTYPE_PSEUDOBULK))), rep("LUAD", ncol(Pseudobulk_LUAD_mKRAS_malignant_cells_df_pruned_common))), c(rep("Normal_scRNASeq", ncol(get(CELLTYPE_PSEUDOBULK))), rep("LUAD_scRNASeq", ncol(Pseudobulk_LUAD_mKRAS_malignant_cells_df_pruned_common))))
-   colnames(colData) <- c("condition","type")
-   rownames(colData) <- colnames(DESeq2_matrix)
-   DESeq2_object <- DESeq2::DESeqDataSetFromMatrix(countData=DESeq2_matrix, colData=colData, design = ~ condition)
-   smallestGroupSize <- min(table(colData[,1]))
-   keep <- rowSums(DESeq2::counts(DESeq2_object) >= 10) >= smallestGroupSize
-   DESeq2_object <- DESeq2_object[keep,]
-   DESeq2_object <- DESeq2::DESeq(DESeq2_object, betaPrior=FALSE)
-   assign(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_mEGFR_results"), DESeq2::results(DESeq2_object, contrast=c("condition","LUAD","celltype"), lfcThreshold = 1, altHypothesis = c("greaterAbs"), alpha=0.05))
-   assign(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_mEGFR_results_df"), data.frame(get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_mEGFR_results"))))
-print(CELLTYPE_PSEUDOBULK)
-print(nrow(na.omit(get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_mEGFR_results_df"))[get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_mEGFR_results_df"))$padj < 0.05 & abs(get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_mEGFR_results_df"))$log2FoldChange) > 1,])))
-print(nrow(na.omit(get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_mEGFR_results_df"))[get(paste0(CELLTYPE_PSEUDOBULK, "_mKRAS_mEGFR_results_df"))$padj < 1.1,])))
-
-for (LUAD_RESULTS in ls(pattern="_mKRAS_results_df$")) {
-write.table(nrow(na.omit(get(LUAD_RESULTS)[get(LUAD_RESULTS)$padj < 0.05 & abs(get(LUAD_RESULTS)$log2FoldChange) > 1,]))/nrow(na.omit(get(LUAD_RESULTS)[get(LUAD_RESULTS)$padj < 1.1,])), file="mKRAS_LUAD_DEGs_proportions.txt", append=TRUE, col.names=FALSE)
-}
-
-mKRAS_LUAD_DEGs_proportions <- read.table("mKRAS_LUAD_DEGs_proportions.txt", header=FALSE)
-
-Celltype_DEGs_proportions_names <- cbind(ls(pattern="__results_df$"), Celltype_DEGs_proportions)
-Celltype_DEGs_proportions_matrix <- matrix(Celltype_DEGs_proportions_names$V2, nrow=42, byrow=FALSE)
-Celltype_DEGs_proportions_matrix <- cbind(mEGFR_LUAD_DEGs_proportions$V2, Celltype_DEGs_proportions_matrix)
-Celltype_DEGs_proportions_matrix <- rbind(c(0, mEGFR_LUAD_DEGs_proportions$V2), Celltype_DEGs_proportions_matrix)
-mKRAS_mEGFR_DEGs_proportion <- nrow(na.omit(get("Pseudobulk_LUAD_mEGFR_malignant_cells_df_pruned_common_mKRAS_mEGFR_results_df")[get("Pseudobulk_LUAD_mEGFR_malignant_cells_df_pruned_common_mKRAS_mEGFR_results_df")$padj < 0.05 & abs(get("Pseudobulk_LUAD_mEGFR_malignant_cells_df_pruned_common_mKRAS_mEGFR_results_df")$log2FoldChange) > 1,]))/nrow(na.omit(get(LUAD_RESULTS)[get("Pseudobulk_LUAD_mEGFR_malignant_cells_df_pruned_common_mKRAS_mEGFR_results_df")$padj < 1.1,]))
-Celltype_DEGs_proportions_matrix <- cbind(c(mKRAS_mEGFR_DEGs_proportion, mKRAS_LUAD_DEGs_proportions$V2), Celltype_DEGs_proportions_matrix)
-Celltype_DEGs_proportions_matrix <- rbind(c(0, mKRAS_mEGFR_DEGs_proportion, mKRAS_LUAD_DEGs_proportions$V2), Celltype_DEGs_proportions_matrix)
-Celltype_DEGs_proportions_matrix_triangular <- Celltype_DEGs_proportions_matrix
-Celltype_DEGs_proportions_matrix_triangular[upper.tri(Celltype_DEGs_proportions_matrix_triangular)] <- NA
-Celltype_DEGs_proportions_matrix_triangular_df <- as.data.frame(Celltype_DEGs_proportions_matrix_triangular)
-rownames(Celltype_DEGs_proportions_matrix_triangular_df) <- c("mKRAS.LUAD", "mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$"))) 
-colnames(Celltype_DEGs_proportions_matrix_triangular_df) <- c("mKRAS.LUAD", "mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$")))
-pheatmap(Celltype_DEGs_proportions_matrix_triangular_df, cluster_rows = FALSE, cluster_cols = FALSE)
-Epithelial_cell_index <- c(c(1,2), c(2,3,4,5,6,7,9,11,12,13,14,19,21,22,25,27,30,34,38,42,43)+1)
-Celltype_DEGs_proportions_matrix_triangular_df_epithelial <- Celltype_DEGs_proportions_matrix_triangular_df[Epithelial_cell_index,Epithelial_cell_index]
-pheatmap(Celltype_DEGs_proportions_matrix_triangular_df_epithelial, cluster_rows = FALSE, cluster_cols = FALSE)
-
-dev.off()
-png(file="Celltype_DEGs_proportions_heatmap_mEGFR_mKRAS.png", height=480, width=560)
-pheatmap(Celltype_DEGs_proportions_matrix_triangular_df, cluster_rows = FALSE, cluster_cols = FALSE)
-dev.off()
-
-Celltype_DEGs_proportions_matrix_df <- as.data.frame(Celltype_DEGs_proportions_matrix)
-rownames(Celltype_DEGs_proportions_matrix_df) <- c("mKRAS.LUAD", "mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$"))) 
-colnames(Celltype_DEGs_proportions_matrix_df) <- c("mKRAS.LUAD", "mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$")))
-Celltype_DEGs_proportions_matrix_df_epithelial <- Celltype_DEGs_proportions_matrix_df[Epithelial_cell_index,Epithelial_cell_index]
-Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- Celltype_DEGs_proportions_matrix_df_epithelial[c(2,1,3:nrow(Celltype_DEGs_proportions_matrix_df_epithelial)),c(2,1,3:ncol(Celltype_DEGs_proportions_matrix_df_epithelial))]
+Celltype_DEGs_proportions_matrix_df_epithelial <- Celltype_DEGs_proportions_matrix_df[-37,-37]
+Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- Celltype_DEGs_proportions_matrix_df_epithelial
 Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- Celltype_DEGs_proportions_matrix_df_epithelial_ordered[,order(Celltype_DEGs_proportions_matrix_df_epithelial_ordered[,1])]
 Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- arrange(Celltype_DEGs_proportions_matrix_df_epithelial_ordered, mEGFR.LUAD)
 Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular <- Celltype_DEGs_proportions_matrix_df_epithelial_ordered
 Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular[upper.tri(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular)] <- NA
-pheatmap(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular, cluster_rows = FALSE, cluster_cols = FALSE)
 
+pdf(file="Celltype_DEGs_proportions_heatmap_mEGFR_scaled.pdf", height=7.2, width=8.4)
+pheatmap(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular, cluster_rows = FALSE, cluster_cols = FALSE, breaks=seq(0, 0.5, length.out=101))
 dev.off()
-png(file="Celltype_DEGs_proportions_epithelial_heatmap_mEGFR_mKRAS.png", height=480, width=560)
-pheatmap(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular, cluster_rows = FALSE, cluster_cols = FALSE)
+
+Celltype_DEGs_proportions <- read.table("Celltype_DEGs_proportions.txt", header=FALSE)
+mEGFR_LUAD_DEGs_proportions <- read.table("mEGFR_LUAD_DEGs_proportions.txt", header=FALSE)
+Celltype_DEGs_proportions_names <- cbind(ls(pattern="__results_df$"), Celltype_DEGs_proportions)
+Celltype_DEGs_proportions_matrix <- matrix(Celltype_DEGs_proportions_names$V2, nrow=42, byrow=FALSE)
+Celltype_DEGs_proportions_matrix <- cbind(mEGFR_LUAD_DEGs_proportions$V2, Celltype_DEGs_proportions_matrix)
+Celltype_DEGs_proportions_matrix <- rbind(c(0, mEGFR_LUAD_DEGs_proportions$V2), Celltype_DEGs_proportions_matrix)
+Celltype_DEGs_proportions_names <- cbind(ls(pattern="__results_df$"), Celltype_DEGs_proportions)
+Celltype_DEGs_proportions_matrix <- matrix(Celltype_DEGs_proportions_names$V2, nrow=42, byrow=FALSE)
+Celltype_DEGs_proportions_matrix <- cbind(mEGFR_LUAD_DEGs_proportions$V2, Celltype_DEGs_proportions_matrix)
+Celltype_DEGs_proportions_matrix <- rbind(c(0, mEGFR_LUAD_DEGs_proportions$V2), Celltype_DEGs_proportions_matrix)
+
+Epithelial_cell_index <- c(1,3,4,5,6,7,9,11,12,13,14,19,21,22,25,27,30,34,38,42)
+Celltype_DEGs_proportions_matrix_df <- as.data.frame(Celltype_DEGs_proportions_matrix)
+rownames(Celltype_DEGs_proportions_matrix_df) <- c("mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$"))) 
+colnames(Celltype_DEGs_proportions_matrix_df) <- c("mEGFR.LUAD", gsub("_Pseudobulk_df.*", "", ls(pattern="Pseudobulk_df_results_df$"))) 
+Celltype_DEGs_proportions_matrix_df_epithelial <- Celltype_DEGs_proportions_matrix_df[Epithelial_cell_index,Epithelial_cell_index]
+Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- Celltype_DEGs_proportions_matrix_df_epithelial
+Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- Celltype_DEGs_proportions_matrix_df_epithelial_ordered[,order(Celltype_DEGs_proportions_matrix_df_epithelial_ordered[,1])]
+Celltype_DEGs_proportions_matrix_df_epithelial_ordered <- arrange(Celltype_DEGs_proportions_matrix_df_epithelial_ordered, mEGFR.LUAD)
+Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular <- Celltype_DEGs_proportions_matrix_df_epithelial_ordered
+Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular[upper.tri(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular)] <- NA
+rownames(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular) <- gsub("\\.", " ", rownames(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular)) 
+colnames(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular) <- gsub("\\.", " ", colnames(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular)) 
+
+pdf(file="Celltype_DEGs_proportions_epithelial_heatmap_mEGFR_scaled.pdf", height=6, width=7)
+pheatmap(Celltype_DEGs_proportions_matrix_df_epithelial_ordered_triangular, cluster_rows = FALSE, cluster_cols = FALSE, breaks=seq(0, 0.4, length.out=101))
 dev.off()
 
